@@ -1,0 +1,6 @@
+numpy
+sounddevice
+faster-whisper
+pyperclip
+keyboard
+mouse
