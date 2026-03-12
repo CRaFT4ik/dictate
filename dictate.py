@@ -440,8 +440,10 @@ hotkey_cfg = load_or_setup_hotkey()
 print(f"\nLoading hallucination filter...")
 halluc_filter = HallucinationFilter(HALLUC_FILE)
 
-print(f"Loading {MODEL_NAME} on GPU...")
+print(f"\nLoading {MODEL_NAME} on GPU...")
 model = WhisperModel(MODEL_NAME, device=DEVICE, compute_type="float16")
+
+print(f"Selected detection language: {LANGUAGE if LANGUAGE is not None else 'auto-detect'}")
 
 mode_label = "STREAMING (chunked)" if STREAMING_MODE else "FULL (after release)"
 print(f"Mode: {mode_label}")
