@@ -1,9 +1,20 @@
+# This file lists the union of client + server deps for users who prefer a
+# one-shot pip install; the scripts auto-install only what they need.
+
+# core
 numpy
 sounddevice
 copykitten
-faster-whisper
 keyboard
 mouse
+
+# client-only
+requests
+
+# server
+flask
+
+# backend
 transformers>=4.57.1
 torch
 torchaudio
@@ -11,3 +22,4 @@ pyannote-audio
 sentencepiece
 omegaconf
 hydra-core
+faster-whisper

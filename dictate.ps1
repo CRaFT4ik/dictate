@@ -9,7 +9,7 @@ Write-Host "Starting voice dictation on: $GPU..." -ForegroundColor Cyan
 
 # Запуск питона в той же папке, где лежит этот скрипт
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-python "$ScriptPath\dictate.py"
+python "$ScriptPath\client.py"
 
 # Пауза, если скрипт упадет (чтобы успеть прочитать ошибку)
 if ($LASTEXITCODE -ne 0) { Pause }

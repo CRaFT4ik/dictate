@@ -18,4 +18,4 @@ fi
 GPU_NAME="${GPU_NAME:-unknown GPU}"
 
 echo "Starting voice dictation on: ${GPU_NAME}..."
-python3 "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/dictate.py"
+python3 "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/client.py"

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dictate</string>
+    <string name="accessibility_service_description">Dictate uses accessibility to paste transcribed text into the focused input field.</string>
+    <string name="floating_notification_text">Dictate is active</string>
+    <string name="floating_notification_channel">Dictate overlay</string>
+    <string name="toast_no_focus">Нет активного поля — текст в буфере</string>
+    <string name="toast_accessibility_off">Включите спец. возможности в настройках</string>
+    <string name="toast_server_unreachable">Сервер недоступен</string>
+    <string name="toast_server_error">Ошибка сервера</string>
+    <string name="tile_label">Dictate</string>
+    <string name="permission_card_title">Permissions required</string>
+    <string name="permission_card_ready">✓ Ready to dictate</string>
+    <string name="permission_microphone">Microphone</string>
+    <string name="permission_overlay">Display over other apps</string>
+    <string name="permission_accessibility">Accessibility</string>
+    <string name="permission_grant">Grant</string>
+    <string name="accessibility_help_title">How to enable Dictate accessibility service</string>
+    <string name="accessibility_help_step1">1. Find \'Dictate\' in the list.</string>
+    <string name="accessibility_help_step2">2. Tap it.</string>
+    <string name="accessibility_help_step3">3. Toggle \'Use service\' on.</string>
+    <string name="accessibility_help_step4">4. Confirm the dialog.</string>
+    <string name="accessibility_help_open_settings">Open Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_clipboard_on_paste">Also copy result to clipboard</string>
+    <string name="settings_clipboard_on_paste_desc">Keep the dictated text in the clipboard after paste</string>
+    <string name="settings_vibrate_on_record">Vibrate on record start</string>
+    <string name="settings_back">Back</string>
+    <string name="home_title">Dictate</string>
+    <string name="home_settings_cog">Settings</string>
+    <string name="home_stats_week">Week</string>
+    <string name="home_stats_month">Month</string>
+    <string name="home_stats_year">Year</string>
+    <string name="home_words_label">words</string>
+    <string name="home_overlay_enable">Enable floating button</string>
+    <string name="home_overlay_disable">Disable</string>
+</resources>

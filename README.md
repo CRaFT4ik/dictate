@@ -42,6 +42,34 @@ Both choices are remembered. Only the dependencies for the selected backend are 
 
 > Requires Python 3.10+ pre-installed.
 
+**How it runs:** the launch script starts `client.py`, which spawns `server.py` on `127.0.0.1:7531` if it isn't already running. The server keeps running after the client exits — kill it manually with `taskkill /F /IM python.exe` (Windows) / `pkill -f server.py` (macOS / Linux).
+
+**Network access:** by default the server binds to `0.0.0.0:7531`. Loopback works without any firewall changes. To allow LAN access, open the port:
+- **Windows** (admin PowerShell): `netsh advfirewall firewall add rule name="Dictate" dir=in action=allow protocol=TCP localport=7531`
+- **Linux**: `sudo ufw allow 7531`
+- **macOS**: confirm the firewall prompt that appears on first server bind to `0.0.0.0`.
+
+---
+
+## 📱 Android client (optional)
+
+Hold a draggable floating button anywhere on Android, speak, release — text is inserted into the focused input via Accessibility paste.
+
+**Setup:**
+1. Edit `android/app/src/main/local.properties` (create if missing): `server.url=http://<your-PC-LAN-IP>:7531`.
+2. Build & install on a device on the same Wi-Fi:
+   ```bash
+   cd android
+   ./gradlew installDebug
+   ```
+3. Launch the app, grant the three requested permissions (mic, draw over, accessibility).
+4. Tap "Enable floating button" or pull down the Quick Settings tile labeled "Dictate".
+5. Long-press the floating button (~200 ms), speak, release.
+
+The Python server on the PC must be running and reachable on the LAN. Open the firewall port `7531` per the "Network access" instructions above.
+
+**Smoke test (emulator):** see `android/scripts/adb_smoke.sh` (or `.ps1`).
+
 ---
 
 ## 🎯 Choosing a model
@@ -63,14 +91,14 @@ Pick **GigaAM** for Russian, **Whisper** for everything else.
 Hold the hotkey, speak a phrase, release — recognized text is pasted into the active app.
 
 **Reconfigure:**
-- `python dictate.py --rebind`  — change the hotkey
-- `python dictate.py --remodel` — switch the model
+- `python client.py --rebind`  — change the hotkey
+- `python client.py --remodel` — switch the model
 
 ---
 
 ## ⚙️ GPU / CPU
 
-Both backends run on NVIDIA GPU (default) or CPU. For GPU you need a recent NVIDIA driver — verify with `nvidia-smi`. To force CPU, edit `DEVICE = "cpu"` in `dictate.py`.
+Both backends run on NVIDIA GPU (default) or CPU. For GPU you need a recent NVIDIA driver — verify with `nvidia-smi`. To force CPU, edit `DEVICE = "cpu"` in `server.py`.
 
 If `faster-whisper` errors out on CUDA/cuDNN, pin a compatible version: `pip install --force-reinstall ctranslate2==4.4.0`.
 

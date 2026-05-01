@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network security configuration for Dictate.
+
+    TRADE-OFF NOTE:
+    Android's <domain> element supports only exact hostnames — it does not accept CIDR ranges
+    (e.g., 192.168.0.0/16) or wildcard IP prefixes.  Enumerating every possible LAN address
+    individually is impractical.  For this MVP the base config permits cleartext traffic
+    globally (cleartextTrafficPermitted="true") because the server is intentionally on a
+    trusted LAN (or loopback emulator address 10.0.2.2) and authentication is explicitly
+    out of scope per the design spec.
+
+    If a stricter posture is needed in a future release, replace the base-config with an
+    explicit <domain-config> listing each known server IP, or switch the server to HTTPS.
+-->
+<network-security-config>
+    <!-- Cleartext is permitted only to the server addresses used in practice. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android emulator host alias -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Common LAN gateway range — 192.168.x.x hosts -->
+        <domain includeSubdomains="false">192.168.1.1</domain>
+        <domain includeSubdomains="false">192.168.0.1</domain>
+    </domain-config>
+
+    <!--
+        Base config: also permits cleartext globally for the full 192.168.x.x / 10.x.x.x /
+        172.16-31.x.x LAN space because Android does not support CIDR in domain-config.
+        This is acceptable for a LAN-only, authentication-free MVP (see trade-off note above).
+    -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
