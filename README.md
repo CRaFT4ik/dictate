@@ -1,121 +1,100 @@
-# 🎙️ Local Voice Dictation Hotkey (Embedded Faster-Whisper)
+# 🎙️ Local Voice Dictation
 
-Offline voice dictation that runs an **embedded speech-to-text model locally on your machine** (no cloud): hold a hotkey/mouse button → speak → text is transcribed with Faster-Whisper and **auto-pasted** into the active window.
+Offline speech-to-text by hotkey: hold a key (or mouse button), speak, release — text is recognized locally and pasted into the active window.
 
-🇷🇺 Russian version: [README.ru.md](./README.ru.md)
+🇷🇺 Russian: [README.ru.md](./README.ru.md)
 
 ---
 
-## ✨ What you get
-- 🔒 **Local / offline** transcription (nothing is sent to the cloud)
-- ⚡ **CUDA GPU acceleration** (optional) via `faster-whisper` (CPU also works)
-- ⌨️🖱️ **Custom hotkey combo** (keyboard + mouse)
-- 📋 **Auto-paste** into the current app (clipboard + paste)
-- 🎚️ **Two modes**
-  - 🧠 **Full mode (default):** record while pressed → transcribe on release (best quality)
-  - 🚀 **Streaming mode:** split by pauses/timer and paste as you speak (faster, less context)
-- 🧹 **Hallucination filter** via `hallucinations.txt` (exact / substring / regex rules)
+## ✨ Features
+
+- 🔒 **100% offline** — nothing leaves your machine
+- 🧠 **Two ASR backends** — pick one at first launch
+  - **Whisper large-v3** — multilingual (99 languages)
+  - **GigaAM v3 e2e_rnnt** — Russian-only, ~2× more accurate, better punctuation
+- ⚡ **CUDA acceleration** (CPU also works)
+- ⌨️🖱️ **Custom hotkey** — keyboard, mouse, or any combo
+- 📋 **Smart clipboard** — text and images survive the dictation paste
+- 📦 **Auto-installs its own dependencies** on first run — no `pip install` needed
 
 ---
 
 ## 🚀 Quick start
 
-### 🧩 Install project
-1) Clone and create venv
-- `git clone <repo-url>`
-- `cd <repo-folder>`
-- `python -m venv .venv`
+```bash
+git clone <repo-url>
+cd dictate
+```
 
-2) Activate venv
-- Windows: `.venv\Scripts\activate`
-- Linux/macOS: `source .venv/bin/activate`
+Then run:
 
-3) Install deps
-- `pip install -U pip`
-- `pip install -r requirements.txt`
+| OS | Command |
+|---|---|
+| 🪟 Windows | `.\dictate.ps1` (run as Administrator) |
+| 🐧 Linux   | `sudo bash dictate.sh` |
+| 🍎 macOS   | `bash dictate.sh` |
 
-Example `requirements.txt`:
-- `faster-whisper`
-- `sounddevice`
-- `numpy`
-- `pyperclip`
-- `keyboard`
-- `mouse`
+**On first launch you'll be asked to:**
+1. Press your hotkey combo (e.g. `Ctrl + Space`) — saved to `voice_key.json`
+2. Pick a model: `[1]` Whisper or `[2]` GigaAM
 
----
+Both choices are remembered. Only the dependencies for the selected backend are installed.
 
-## 🧠⚡ Install CUDA (GPU)
-
-This project can run on NVIDIA GPUs via CUDA (set `DEVICE="cuda"`). You need:
-
-1) NVIDIA driver
-- Install a recent NVIDIA driver for your GPU.
-- Verify it works:
-  - `nvidia-smi`
-
-2) CUDA Toolkit (optional)
-- Often the driver is enough, because many Python packages ship CUDA runtime libraries.
-- If you want the full toolkit, install CUDA Toolkit from NVIDIA:
-  - CUDA downloads: https://developer.nvidia.com/cuda-downloads
-  - Windows install guide: https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/
-  - Linux install guide: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/
-
-3) Install Python dependencies
-- `pip install -r requirements.txt`
-
-Important note: faster-whisper / CTranslate2 CUDA compatibility
-- `faster-whisper` uses `ctranslate2` under the hood, and CUDA/cuDNN compatibility matters.
-- If you get errors like “Could not load cudnn” / “CUDA version mismatch” / “No CUDA device”, try:
-  - Make sure `nvidia-smi` works (driver installed correctly)
-  - Update your NVIDIA driver
-  - Reinstall packages in a clean venv
-  - Pin `ctranslate2` to a compatible version (example):
-    - `pip install --force-reinstall ctranslate2==4.4.0`
-
-If GPU setup is too painful, switch to CPU:
-- Set `DEVICE="cpu"` in `dictate.py`
+> Requires Python 3.10+ pre-installed.
 
 ---
 
-## ▶️ Run
-- 🪟 Windows: run `dictate.bat` (as Administrator)
-- 🐧 Linux: run `bash dictate.sh`
+## 🎯 Choosing a model
 
-On first run, hold your desired hotkey combo (~1 second) — it will be saved to `voice_key.json`.
+| | Whisper large-v3 | GigaAM v3 e2e_rnnt |
+|---|---|---|
+| Languages | 99 | Russian only |
+| Russian WER | ~21% | **~11%** |
+| Punctuation | ✅ | ✅ (notably better, esp. commas) |
+| Model size | ~3 GB | ~0.8 GB |
+| Extra deps | small | heavy (torch + transformers, ~2 GB) |
 
-Rebind hotkey:
-- `python dictate.py --rebind`
+Pick **GigaAM** for Russian, **Whisper** for everything else.
 
 ---
 
-## ⚙️ Settings (edit at the top of `dictate.py`)
-- `MODEL_NAME` — Whisper model name (e.g. `large-v3-turbo`)
-- `DEVICE` — `cuda` or `cpu`
-- `LANGUAGE` — language code (e.g. `en`, `ru`, `de`), or `None` for auto-detect
-- `STREAMING_MODE` — `False` (best quality) / `True` (paste during speech)
+## ▶️ Usage
+
+Hold the hotkey, speak a phrase, release — recognized text is pasted into the active app.
+
+**Reconfigure:**
+- `python dictate.py --rebind`  — change the hotkey
+- `python dictate.py --remodel` — switch the model
+
+---
+
+## ⚙️ GPU / CPU
+
+Both backends run on NVIDIA GPU (default) or CPU. For GPU you need a recent NVIDIA driver — verify with `nvidia-smi`. To force CPU, edit `DEVICE = "cpu"` in `dictate.py`.
+
+If `faster-whisper` errors out on CUDA/cuDNN, pin a compatible version: `pip install --force-reinstall ctranslate2==4.4.0`.
 
 ---
 
 ## 🧽 Hallucination filter
-Edit `hallucinations.txt`:
-- exact line match: `some phrase`
-- substring match: `~subscribe`
-- regex: `^(thanks|thank you).*`
-- comments: lines starting with `#`
+
+Whisper sometimes hallucinates phrases like "Thanks for watching" on silence. `hallucinations.txt` strips them from the output:
+
+- `some phrase`   — exact match
+- `~subscribe`    — substring
+- `^thanks.*`     — regex
+- `# comment`     — comment
 
 ---
 
 ## 📝 Notes
-- 🛡️ Uses global keyboard/mouse hooks; admin/root may be required.
-- 🐧 On Linux: hotkeys/paste depend on X11 vs Wayland (Wayland may block global hooks/input injection).
-- 📋 Auto-paste uses the clipboard temporarily and then restores it.
+
+- 🛡️ Global keyboard/mouse hooks need admin/root rights on Windows and Linux.
+- 🐧 On Linux, Wayland often blocks global hooks — X11 sessions work better.
+- 📋 The clipboard is preserved across the paste (text and images both restored, cross-platform).
 
 ---
 
 ## 📄 License
-This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
-- You are free to use, modify, and redistribute this software, including commercially, **as long as** any distributed derivative work remains **GPL-3.0 licensed** and you provide the corresponding source code.
-- You must keep the copyright and license notices.
-
-See the [LICENSE](./LICENSE) file for details.
+GPL-3.0 — see [LICENSE](./LICENSE).
