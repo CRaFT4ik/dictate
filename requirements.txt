@@ -4,3 +4,10 @@ faster-whisper
 pyperclip
 keyboard
 mouse
+transformers>=4.57.1
+torch
+torchaudio
+pyannote-audio
+sentencepiece
+omegaconf
+hydra-core

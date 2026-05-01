@@ -3,20 +3,24 @@
 import os
 import sys
 import re
+
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import json
 import numpy as np
 import sounddevice as sd
-from faster_whisper import WhisperModel
 import pyperclip
 import keyboard
 import mouse
 import time
 
 # ========================= SETTINGS =========================
-MODEL_NAME = "large-v3-turbo"
 DEVICE = "cuda"
 FS = 16000
 LANGUAGE = "ru"  # e.g. "en", "de", "uk", "es". Use None for auto-detect (slower/less stable).
+
+# Populated from config at startup by load_or_setup_config():
+BACKEND = "whisper"
+MODEL_NAME = "large-v3-turbo"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "voice_key.json")
@@ -210,38 +214,107 @@ def is_combo_pressed(cfg):
     return True
 
 
-def load_or_setup_hotkey():
-    rebind = "--rebind" in sys.argv
+def select_model_backend():
+    print("\n" + "=" * 60)
+    print("  MODEL SELECTION")
+    print("=" * 60)
+    print("  [1]  Whisper large-v3          multilingual, ~3.1 GB VRAM")
+    print("  [2]  GigaAM v3 e2e_rnnt       Russian, ~0.8 GB VRAM")
+    print("                                 punctuation + normalization")
+    print()
+    print("  Press 1 or 2:")
 
-    if not rebind and os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-            if cfg.get("keys") and len(cfg["keys"]) > 0:
-                print(f"Record key: [{format_combo(cfg)}]  (--rebind to change)")
-                return cfg
-        except Exception:
-            pass
+    while True:
+        ev = keyboard.read_event(suppress=False)
+        if ev.event_type == "down" and ev.name in ("1", "2"):
+            choice = ev.name
+            break
 
-    cfg = record_hotkey()
-    label = format_combo(cfg)
-    print(f"\n  → Selected combo: [{label}]")
-    print(f"  ENTER — confirm, ESC — choose again.")
+    options = {
+        "1": ("whisper", "large-v3", "Whisper large-v3"),
+        "2": ("gigaam",  "e2e_rnnt",       "GigaAM v3 e2e_rnnt"),
+    }
+    backend, model_name, label = options[choice]
+    print(f"\n  → Selected: {label}")
+    print("  ENTER — confirm, ESC — choose again.")
 
     while True:
         ev = keyboard.read_event(suppress=False)
         if ev.event_type == "down":
             if ev.name == "enter":
-                break
+                return backend, model_name
             elif ev.name == "esc":
-                return load_or_setup_hotkey()
+                return select_model_backend()
 
+
+def load_or_setup_config():
+    rebind  = "--rebind"  in sys.argv
+    remodel = "--remodel" in sys.argv
+
+    cfg = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            pass
+
+    # --- Hotkey ---
+    hotkey_cfg = {"keys": cfg["keys"]} if cfg.get("keys") else None
+    if not rebind and hotkey_cfg:
+        print(f"Record key: [{format_combo(hotkey_cfg)}]  (--rebind to change)")
+    else:
+        hotkey_cfg = record_hotkey()
+        label = format_combo(hotkey_cfg)
+        print(f"\n  → Selected combo: [{label}]")
+        print("  ENTER — confirm, ESC — choose again.")
+        while True:
+            ev = keyboard.read_event(suppress=False)
+            if ev.event_type == "down":
+                if ev.name == "enter":
+                    break
+                elif ev.name == "esc":
+                    hotkey_cfg = record_hotkey()
+                    print(f"\n  → Selected combo: [{format_combo(hotkey_cfg)}]")
+                    print("  ENTER — confirm, ESC — choose again.")
+
+    # --- Model ---
+    backend    = cfg.get("backend")
+    model_name = cfg.get("model_name")
+    model_ok   = backend in ("whisper", "gigaam") and bool(model_name)
+
+    if not remodel and model_ok:
+        label = f"GigaAM v3 {model_name}" if backend == "gigaam" else f"Whisper {model_name}"
+        print(f"Model: {label}  (--remodel to change)")
+    else:
+        backend, model_name = select_model_backend()
+
+    new_cfg = {"keys": hotkey_cfg["keys"], "backend": backend, "model_name": model_name}
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
+        json.dump(new_cfg, f, ensure_ascii=False, indent=2)
 
-    print(f"  Saved to {CONFIG_FILE}\n")
     time.sleep(0.3)
-    return cfg
+    return hotkey_cfg, backend, model_name
+
+
+def load_model(backend, model_name):
+    if backend == "gigaam":
+        import torch
+        from transformers import AutoModel
+        print(f"Loading GigaAM v3 {model_name}...")
+        m = AutoModel.from_pretrained(
+            "ai-sage/GigaAM-v3",
+            revision=model_name,
+            trust_remote_code=True,
+        )
+        if DEVICE == "cuda":
+            m = m.cuda()
+        m.eval()
+        return m
+    else:
+        from faster_whisper import WhisperModel
+        print(f"Loading Whisper {model_name} on {DEVICE}...")
+        return WhisperModel(model_name, device=DEVICE, compute_type="float16")
 
 
 # ====================== COMMON FUNCTIONS ========================
@@ -274,19 +347,29 @@ def get_rms(audio_flat):
 
 
 def recognize(audio_flat, prev_text=""):
-    segments, _ = model.transcribe(
-        audio_flat,
-        language=LANGUAGE,
-        beam_size=5,
-        vad_filter=True,
-        vad_parameters=dict(
-            min_silence_duration_ms=200,
-            speech_pad_ms=100,
-        ),
-        condition_on_previous_text=True,
-        initial_prompt=prev_text[-300:] if prev_text else None,
-    )
-    return " ".join(s.text.strip() for s in segments).strip()
+    if BACKEND == "gigaam":
+        import torch
+        asr = model.model
+        wav = torch.FloatTensor(audio_flat).to(asr._device).to(asr._dtype).unsqueeze(0)
+        length = torch.full([1], wav.shape[-1], device=asr._device)
+        with torch.inference_mode():
+            encoded, encoded_len = asr.forward(wav, length)
+            result = asr.decoding.decode(asr.head, encoded, encoded_len)[0]
+        return result.strip() if result else ""
+    else:
+        segments, _ = model.transcribe(
+            audio_flat,
+            language=LANGUAGE,
+            beam_size=5,
+            vad_filter=True,
+            vad_parameters=dict(
+                min_silence_duration_ms=200,
+                speech_pad_ms=100,
+            ),
+            condition_on_previous_text=True,
+            initial_prompt=prev_text[-300:] if prev_text else None,
+        )
+        return " ".join(s.text.strip() for s in segments).strip()
 
 
 def filter_and_paste(raw_text, prev_text, halluc_filter):
@@ -435,15 +518,15 @@ def record_streaming(hotkey_cfg, halluc_filter):
 
 # ======================== START =============================
 
-hotkey_cfg = load_or_setup_hotkey()
+hotkey_cfg, BACKEND, MODEL_NAME = load_or_setup_config()
 
 print(f"\nLoading hallucination filter...")
 halluc_filter = HallucinationFilter(HALLUC_FILE)
 
-print(f"\nLoading {MODEL_NAME} on GPU...")
-model = WhisperModel(MODEL_NAME, device=DEVICE, compute_type="float16")
+model = load_model(BACKEND, MODEL_NAME)
 
-print(f"Selected detection language: {LANGUAGE if LANGUAGE is not None else 'auto-detect'}")
+if BACKEND == "whisper":
+    print(f"Selected detection language: {LANGUAGE if LANGUAGE is not None else 'auto-detect'}")
 
 mode_label = "STREAMING (chunked)" if STREAMING_MODE else "FULL (after release)"
 print(f"Mode: {mode_label}")
@@ -458,10 +541,10 @@ print()
 
 record_fn = record_streaming if STREAMING_MODE else record_full
 
-while True:
-    if is_combo_pressed(hotkey_cfg):
-        record_fn(hotkey_cfg, halluc_filter)
-    # if keyboard.is_pressed("esc"):
-    #     print("\nExit.")
-    #     break
-    time.sleep(0.01)
+try:
+    while True:
+        if is_combo_pressed(hotkey_cfg):
+            record_fn(hotkey_cfg, halluc_filter)
+        time.sleep(0.01)
+except KeyboardInterrupt:
+    print("\nBye.")
