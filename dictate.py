@@ -2,16 +2,68 @@
 
 import os
 import sys
-import re
+import subprocess
+import importlib.util
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
+# ============== DEPENDENCY AUTO-INSTALL ==============================
+# Core packages are needed for the script to even start.
+# Per-backend packages (Whisper / GigaAM) are installed lazily inside
+# load_model() — no point pulling ~2 GB of GigaAM deps if the user picked
+# Whisper, and vice versa.
+
+CORE_DEPS = [
+    # (import name, pip name)
+    ("numpy",       "numpy"),
+    ("copykitten",  "copykitten"),
+    ("sounddevice", "sounddevice"),
+    ("keyboard",    "keyboard"),
+    ("mouse",       "mouse"),
+]
+
+WHISPER_DEPS = [
+    ("faster_whisper", "faster-whisper"),
+]
+
+GIGAAM_DEPS = [
+    ("transformers",   "transformers>=4.57.1"),
+    ("torch",          "torch"),
+    ("torchaudio",     "torchaudio"),
+    ("pyannote.audio", "pyannote-audio"),
+    ("sentencepiece",  "sentencepiece"),
+    ("omegaconf",      "omegaconf"),
+    ("hydra",          "hydra-core"),
+]
+
+
+def _ensure_deps(deps, label):
+    """Install missing packages from `deps` (list of (import_name, pip_name))."""
+    missing = []
+    for imp_name, pip_name in deps:
+        try:
+            if importlib.util.find_spec(imp_name) is None:
+                missing.append(pip_name)
+        except (ImportError, ValueError):
+            missing.append(pip_name)
+    if not missing:
+        return
+    print(f"\nInstalling {label} dependencies: {' '.join(missing)}")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
+
+
+_ensure_deps(CORE_DEPS, "core")
+
+
+import re
 import json
+import time
 import numpy as np
 import sounddevice as sd
 import copykitten
 import keyboard
 import mouse
-import time
 
 # ========================= SETTINGS =========================
 DEVICE = "cuda"
@@ -299,6 +351,7 @@ def load_or_setup_config():
 
 def load_model(backend, model_name):
     if backend == "gigaam":
+        _ensure_deps(GIGAAM_DEPS, "GigaAM")
         import torch
         from transformers import AutoModel
         print(f"Loading GigaAM v3 {model_name}...")
@@ -312,6 +365,7 @@ def load_model(backend, model_name):
         m.eval()
         return m
     else:
+        _ensure_deps(WHISPER_DEPS, "Whisper")
         from faster_whisper import WhisperModel
         print(f"Loading Whisper {model_name} on {DEVICE}...")
         return WhisperModel(model_name, device=DEVICE, compute_type="float16")
