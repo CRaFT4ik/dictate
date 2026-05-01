@@ -8,7 +8,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import json
 import numpy as np
 import sounddevice as sd
-import pyperclip
+import copykitten
 import keyboard
 import mouse
 import time
@@ -319,23 +319,48 @@ def load_model(backend, model_name):
 
 # ====================== COMMON FUNCTIONS ========================
 
-def safe_paste(text):
-    # Save the current clipboard
-    try:
-        old_clipboard = pyperclip.paste()
-    except Exception:
-        old_clipboard = ""
+### Cross-platform clipboard save/restore via copykitten.
+### Backed by Rust's arboard crate — talks directly to Win32 / NSPasteboard /
+### X11 / Wayland with no external tools (no xclip, pywin32, PyObjC needed).
+### Preserves text and images across the dictation paste.
 
-    pyperclip.copy(text)
-    time.sleep(0.03)
-    keyboard.press_and_release("ctrl+v")
-    time.sleep(0.05)
-
-    # Restore
+def _clipboard_snapshot():
+    """Returns ('text', str), ('image', (rgba_bytes, w, h)), or None."""
     try:
-        pyperclip.copy(old_clipboard)
-    except Exception:
+        return ("text", copykitten.paste())
+    except copykitten.CopykittenError:
         pass
+    try:
+        return ("image", copykitten.paste_image())
+    except copykitten.CopykittenError:
+        pass
+    return None
+
+
+def _clipboard_restore(snapshot):
+    if snapshot is None:
+        return
+    kind, data = snapshot
+    try:
+        if kind == "text":
+            copykitten.copy(data)
+        elif kind == "image":
+            pixels, w, h = data
+            copykitten.copy_image(pixels, w, h)
+    except copykitten.CopykittenError:
+        pass
+
+
+_PASTE_HOTKEY = "command+v" if sys.platform == "darwin" else "ctrl+v"
+
+
+def safe_paste(text):
+    snapshot = _clipboard_snapshot()
+    copykitten.copy(text)
+    time.sleep(0.03)
+    keyboard.press_and_release(_PASTE_HOTKEY)
+    time.sleep(0.05)
+    _clipboard_restore(snapshot)
 
 
 def get_rms(audio_flat):

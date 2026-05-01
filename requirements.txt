@@ -1,7 +1,7 @@
 numpy
 sounddevice
+copykitten
 faster-whisper
-pyperclip
 keyboard
 mouse
 transformers>=4.57.1
